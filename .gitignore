@@ -4,6 +4,13 @@ storage/*.db
 storage/*.db-*
 storage/media/*
 !storage/media/.gitkeep
+backend/storage/*.db
+backend/storage/*.db-*
+backend/storage/media/*
+!backend/storage/media/.gitkeep
+.env
+frontend/.env
+backend/.env
 .DS_Store
 npm-debug.log*
 artifacts/

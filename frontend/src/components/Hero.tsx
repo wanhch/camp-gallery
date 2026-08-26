@@ -6,7 +6,7 @@ import { DawnCanvas } from "./DawnCanvas";
 
 interface HeroProps {
   stats: PlatformStats;
-  onUpload: () => void;
+  onUpload?: () => void;
 }
 
 const heroMotion = {
@@ -65,10 +65,10 @@ export function Hero({ stats, onUpload }: HeroProps) {
           736 位新曙光人正在汇成 16 支并肩连队。每一个光点都是此刻的你，每一次连接都在写下我们的共同记忆。
         </motion.p>
         <motion.div className="hero__actions" variants={heroMotion} transition={{ duration: 0.55 }}>
-          <button className="button button--primary button--large" type="button" onClick={onUpload} data-cursor="launch">
+          {onUpload && <button className="button button--primary button--large" type="button" onClick={onUpload} data-cursor="launch">
             <Camera aria-hidden="true" />
             上传此刻
-          </button>
+          </button>}
           <button className="button button--glass button--large" type="button" onClick={scrollToCompanies}>
             浏览 16 连
             <ArrowDown aria-hidden="true" />

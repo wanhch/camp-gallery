@@ -12,7 +12,7 @@ export function QrDialog({ onClose, onNotice }: QrDialogProps) {
   const titleId = useId();
   const [qrData, setQrData] = useState("");
   const [copied, setCopied] = useState(false);
-  const shareUrl = typeof window === "undefined" ? "" : `${window.location.origin}${window.location.pathname}`;
+  const shareUrl = typeof window === "undefined" ? "" : `${window.location.origin}/gallery`;
 
   useEffect(() => {
     QRCode.toDataURL(shareUrl, {

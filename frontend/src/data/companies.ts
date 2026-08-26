@@ -44,3 +44,18 @@ export const companies: Company[] = companyDetails.map((detail, index) => ({
 }));
 
 export const getCompany = (id: number) => companies.find((company) => company.id === id) ?? companies[0];
+
+export const staffCategory = {
+  id: 17,
+  number: "STAFF",
+  name: "工作人员／辅导老师",
+  motto: "每一份守护，都值得被看见",
+  summary: "记录辅导老师与工作人员在集训背后的耐心陪伴、组织保障与温暖付出。",
+  image: "/demo/team-briefing.jpg",
+  accent: "#b71f2a",
+  members: 0
+} satisfies Company;
+
+export const uploadCategories = [...companies, staffCategory];
+export const getCategory = (id: number) => id === 17 ? staffCategory : getCompany(id);
+export const categoryLabel = (id: number) => id === 17 ? "工作人员／辅导老师" : `第 ${getCompany(id).number} 连`;

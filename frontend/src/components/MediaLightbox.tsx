@@ -1,6 +1,6 @@
 import { useEffect, useId } from "react";
 import { ArrowLeft, ArrowRight, Heart, Share2, X } from "lucide-react";
-import { getCompany } from "../data/companies";
+import { categoryLabel, getCategory } from "../data/companies";
 import type { MediaItem } from "../types";
 import { ModalFrame } from "./ModalFrame";
 
@@ -17,7 +17,7 @@ interface MediaLightboxProps {
 
 export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, onClose, onLike, onNotice }: MediaLightboxProps) {
   const titleId = useId();
-  const company = getCompany(item.company);
+  const company = getCategory(item.company);
 
   useEffect(() => {
     const handleArrowKeys = (event: KeyboardEvent) => {
@@ -32,7 +32,7 @@ export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, 
     const url = `${window.location.origin}${window.location.pathname}?moment=${encodeURIComponent(item.id)}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: item.caption, text: `第 ${company.number} 连 · ${item.caption}`, url });
+        await navigator.share({ title: item.caption, text: `${categoryLabel(company.id)} · ${item.caption}`, url });
       } catch {
         return;
       }
@@ -66,9 +66,9 @@ export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, 
         {item.isDemo && <span className="demo-label">示例影像</span>}
       </div>
       <div className="lightbox-info">
-        <span>第 {company.number} 连 · {company.name}</span>
+        <span>{categoryLabel(company.id)}{company.id === 17 ? "" : ` · ${company.name}`}</span>
         <h2 id={titleId}>{item.caption}</h2>
-        <p>{item.author} · {new Date(item.createdAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+        <p>{new Date(item.createdAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
         <div className="lightbox-actions">
           <button className="button button--soft" type="button" onClick={() => onLike(item)}>
             <Heart aria-hidden="true" />{item.likes} 次加油

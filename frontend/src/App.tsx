@@ -17,20 +17,22 @@ import { SugonCursor } from "./components/SugonCursor";
 import { UploadDialog } from "./components/UploadDialog";
 import type { MediaItem, PlatformConfig, PlatformStats } from "./types";
 
-const defaultStats: PlatformStats = { trainees: 736, companies: 16, media: 0, photos: 0, videos: 0 };
-const defaultConfig: PlatformConfig = { uploadCodeRequired: false, maxFileMb: 120, maxFiles: 10 };
+const defaultStats: PlatformStats = { trainees: 736, companies: 16, media: 0, photos: 0, videos: 0, ranking: [] };
+const defaultConfig: PlatformConfig = { maxFileMb: 100, maxFiles: 20, aiMode: "demo" };
 
 function readCompanyParam() {
   const value = Number(new URLSearchParams(window.location.search).get("company"));
   return Number.isInteger(value) && value >= 1 && value <= 16 ? value : 0;
 }
 
-export default function App() {
+interface AppProps { readOnly?: boolean; initialUpload?: boolean }
+
+export default function App({ readOnly = false, initialUpload = false }: AppProps) {
   const initialCompany = readCompanyParam();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [stats, setStats] = useState(defaultStats);
   const [config, setConfig] = useState(defaultConfig);
-  const [showUpload, setShowUpload] = useState(false);
+  const [showUpload, setShowUpload] = useState(initialUpload);
   const [showQr, setShowQr] = useState(false);
   const [showcaseCompany, setShowcaseCompany] = useState(initialCompany || 1);
   const [galleryCompany, setGalleryCompany] = useState(initialCompany);
@@ -121,10 +123,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header onUpload={() => setShowUpload(true)} onQr={() => setShowQr(true)} />
+      <Header onUpload={readOnly ? undefined : () => setShowUpload(true)} onQr={() => setShowQr(true)} />
       <ScrollJourney />
       <main id="main-content" className="narrative-flow">
-        <Hero stats={stats} onUpload={() => setShowUpload(true)} />
+        <Hero stats={stats} onUpload={readOnly ? undefined : () => setShowUpload(true)} />
 
         <section className="pulse-band" aria-label="平台实时汇聚状态">
           <div className="page-shell pulse-band__inner">
@@ -158,10 +160,16 @@ export default function App() {
           onCompanyChange={selectGalleryCompany}
           onOpen={openMedia}
           onLike={handleLike}
-          onUpload={() => setShowUpload(true)}
+          onUpload={readOnly ? undefined : () => setShowUpload(true)}
         />
+        <section className="section ranking-section" id="ranking">
+          <div className="page-shell">
+            <div className="section-heading"><span className="section-kicker">COMPANY RANKING</span><h2>连队风采榜</h2><p>按当前公开有效素材数量实时统计，工作人员不参与排名。</p></div>
+            <div className="ranking-grid">{stats.ranking.slice(0, 16).map((item, index) => <article className="ranking-card" key={item.categoryId}><strong>{String(index + 1).padStart(2, "0")}</strong><span>{item.name}</span><em>{item.count} 个瞬间</em></article>)}</div>
+          </div>
+        </section>
         <OfficialStories />
-        <GrowthTimeline onUpload={() => setShowUpload(true)} />
+        <GrowthTimeline onUpload={readOnly ? undefined : () => setShowUpload(true)} />
       </main>
 
       <footer className="site-footer">
@@ -181,11 +189,11 @@ export default function App() {
         </div>
       </footer>
 
-      <MobileNav onUpload={() => setShowUpload(true)} onQr={() => setShowQr(true)} />
+      <MobileNav onUpload={readOnly ? undefined : () => setShowUpload(true)} onQr={() => setShowQr(true)} />
       <SugonCursor />
 
       <AnimatePresence>
-        {showUpload && (
+        {!readOnly && showUpload && (
           <UploadDialog
             key="upload"
             onClose={closeUpload}

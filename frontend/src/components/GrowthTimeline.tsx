@@ -3,7 +3,7 @@ import { Camera, Flag, Footprints, Sunrise, Upload } from "lucide-react";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 
 interface GrowthTimelineProps {
-  onUpload: () => void;
+  onUpload?: () => void;
 }
 
 const milestones = [
@@ -84,9 +84,9 @@ export function GrowthTimeline({ onUpload }: GrowthTimelineProps) {
         <div className="page-shell memory-cta__content">
           <span>OUR STORY IS STILL GROWING</span>
           <h2>你的镜头，是这段共同记忆的一部分</h2>
-          <button className="button button--primary button--large" type="button" onClick={onUpload} data-cursor="launch">
+          {onUpload && <button className="button button--primary button--large" type="button" onClick={onUpload} data-cursor="launch">
             <Upload aria-hidden="true" />上传我的集训时刻
-          </button>
+          </button>}
         </div>
       </motion.div>
     </section>

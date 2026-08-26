@@ -3,7 +3,7 @@ import { Camera, QrCode } from "lucide-react";
 import { BrandMark } from "./BrandMark";
 
 interface HeaderProps {
-  onUpload: () => void;
+  onUpload?: () => void;
   onQr: () => void;
 }
 
@@ -41,10 +41,10 @@ export function Header({ onUpload, onQr }: HeaderProps) {
           <button className="icon-button header-qr" type="button" onClick={onQr} aria-label="打开分享二维码">
             <QrCode aria-hidden="true" />
           </button>
-          <button className="button button--primary header-upload" type="button" onClick={onUpload}>
+          {onUpload && <button className="button button--primary header-upload" type="button" onClick={onUpload}>
             <Camera aria-hidden="true" />
             上传此刻
-          </button>
+          </button>}
         </div>
       </div>
     </header>

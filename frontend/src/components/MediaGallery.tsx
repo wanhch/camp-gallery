@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Camera, ChevronDown, Heart, Images, Play, Video } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { companies, getCompany } from "../data/companies";
+import { categoryLabel, getCategory, uploadCategories } from "../data/companies";
 import type { MediaItem, MediaType } from "../types";
 
 interface MediaGalleryProps {
@@ -10,7 +10,7 @@ interface MediaGalleryProps {
   onCompanyChange: (company: number) => void;
   onOpen: (item: MediaItem) => void;
   onLike: (item: MediaItem) => void;
-  onUpload: () => void;
+  onUpload?: () => void;
 }
 
 type MediaFilter = "all" | MediaType;
@@ -36,7 +36,7 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
   }), [filter, media, selectedCompany]);
 
   const visibleMedia = expanded ? filteredMedia : filteredMedia.slice(0, 12);
-  const selectedLabel = selectedCompany ? `第 ${getCompany(selectedCompany).number} 连` : "全部连队";
+  const selectedLabel = selectedCompany ? categoryLabel(selectedCompany) : "全部分类";
 
   return (
     <section className="gallery-section section" id="gallery" aria-labelledby="gallery-heading">
@@ -79,9 +79,9 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
           <label className="company-select">
             <span className="sr-only">按连队筛选</span>
             <select value={selectedCompany} onChange={(event) => onCompanyChange(Number(event.target.value))}>
-              <option value={0}>全部连队</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>第 {company.number} 连 · {company.name}</option>
+              <option value={0}>全部分类</option>
+              {uploadCategories.map((company) => (
+                <option key={company.id} value={company.id}>{company.id === 17 ? company.name : `第 ${company.number} 连 · ${company.name}`}</option>
               ))}
             </select>
             <ChevronDown aria-hidden="true" />
@@ -91,7 +91,7 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
         {visibleMedia.length > 0 ? (
           <motion.div className="media-grid" layout={!reduceMotion}>
             {visibleMedia.map((item, index) => {
-              const company = getCompany(item.company);
+              const company = getCategory(item.company);
               return (
                 <motion.article
                   layout={!reduceMotion}
@@ -116,9 +116,8 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
                     <span className="media-card__shade" aria-hidden="true" />
                     {item.type === "video" && <span className="media-card__play"><Play fill="currentColor" aria-hidden="true" /></span>}
                     <span className="media-card__meta">
-                      <small>第 {company.number} 连 · {formatMoment(item.createdAt)}</small>
+                      <small>{categoryLabel(company.id)} · {formatMoment(item.createdAt)}</small>
                       <strong>{item.caption}</strong>
-                      <em>{item.author}</em>
                     </span>
                     {item.isDemo && <span className="demo-label">示例</span>}
                   </button>
@@ -135,7 +134,7 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
             <Camera aria-hidden="true" />
             <h3>这一格，等你点亮</h3>
             <p>{selectedLabel}还没有符合筛选条件的影像。</p>
-            <button className="button button--primary" type="button" onClick={onUpload}>上传第一个瞬间</button>
+            {onUpload && <button className="button button--primary" type="button" onClick={onUpload}>上传第一个瞬间</button>}
           </div>
         )}
 
