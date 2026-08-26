@@ -33,6 +33,8 @@ npm run dev
 - 观看：`http://localhost:5173/gallery`
 - 管理：`http://localhost:5173/admin`
 - 大屏：`http://localhost:5173/screen`
+- 连队详情示例：`http://localhost:5173/company/10`
+- 工作人员专区：`http://localhost:5173/staff`
 
 初始管理员密码按需求设为 `sugonhygon`。公网部署前必须在 `backend/.env` 中配置新的 `AUTH_SECRET`，密码和密钥均不得提交到 GitHub。
 

@@ -1,232 +1,61 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, Camera, Images, ShieldCheck, Video } from "lucide-react";
-import { fetchConfig, fetchMedia, fetchStats, likeMedia } from "./api";
+import { fetchMedia, fetchStats } from "./api";
 import { BrandMark } from "./components/BrandMark";
 import { CompanyShowcase } from "./components/CompanyShowcase";
-import { GrowthTimeline } from "./components/GrowthTimeline";
 import { Header } from "./components/Header";
 import { Hero } from "./components/Hero";
-import { MediaGallery } from "./components/MediaGallery";
-import { MediaLightbox } from "./components/MediaLightbox";
 import { MobileNav } from "./components/MobileNav";
-import { OfficialStories } from "./components/OfficialStories";
 import { QrDialog } from "./components/QrDialog";
 import { ScrollJourney } from "./components/ScrollJourney";
 import { SugonCursor } from "./components/SugonCursor";
-import { UploadDialog } from "./components/UploadDialog";
-import type { MediaItem, PlatformConfig, PlatformStats } from "./types";
+import { categoryLabel } from "./data/companies";
+import type { MediaItem, PlatformStats } from "./types";
 
-const defaultStats: PlatformStats = { trainees: 736, companies: 16, media: 0, photos: 0, videos: 0, ranking: [] };
-const defaultConfig: PlatformConfig = { maxFileMb: 100, maxFiles: 20, aiMode: "demo" };
+const emptyStats: PlatformStats = { trainees: 736, companies: 16, media: 0, photos: 0, videos: 0, ranking: [] };
 
-function readCompanyParam() {
-  const value = Number(new URLSearchParams(window.location.search).get("company"));
-  return Number.isInteger(value) && value >= 1 && value <= 17 ? value : 0;
-}
-
-interface AppProps { readOnly?: boolean; initialUpload?: boolean }
-
-export default function App({ readOnly = false, initialUpload = false }: AppProps) {
-  const initialCompany = readCompanyParam();
+export default function App() {
   const [media, setMedia] = useState<MediaItem[]>([]);
-  const [stats, setStats] = useState(defaultStats);
-  const [config, setConfig] = useState(defaultConfig);
-  const [showUpload, setShowUpload] = useState(initialUpload);
+  const [stats, setStats] = useState(emptyStats);
+  const [selectedCompany, setSelectedCompany] = useState(1);
   const [showQr, setShowQr] = useState(false);
-  const [showcaseCompany, setShowcaseCompany] = useState(initialCompany || 1);
-  const [galleryCompany, setGalleryCompany] = useState(initialCompany);
-  const [activeMediaId, setActiveMediaId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
-
-  const showNotice = useCallback((message: string) => {
-    setNotice(message);
-    window.setTimeout(() => setNotice((current) => current === message ? "" : current), 3200);
-  }, []);
+  const showNotice = useCallback((message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3000); }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.allSettled([fetchMedia(), fetchStats(), fetchConfig()]).then(([mediaResult, statsResult, configResult]) => {
-      if (cancelled) return;
-      if (mediaResult.status === "fulfilled") {
-        setMedia(mediaResult.value.items);
-        const moment = new URLSearchParams(window.location.search).get("moment");
-        if (moment && mediaResult.value.items.some((item) => item.id === moment)) setActiveMediaId(moment);
-      } else {
-        showNotice("影像服务暂时没有响应，正在显示页面骨架");
-      }
+    Promise.allSettled([fetchMedia(), fetchStats()]).then(([mediaResult, statsResult]) => {
+      if (mediaResult.status === "fulfilled") setMedia(mediaResult.value.items);
+      else showNotice("影像服务暂时没有响应");
       if (statsResult.status === "fulfilled") setStats(statsResult.value);
-      if (configResult.status === "fulfilled") setConfig(configResult.value);
     });
-    return () => { cancelled = true; };
   }, [showNotice]);
 
-  const updateUrl = useCallback((key: string, value?: string) => {
-    const url = new URL(window.location.href);
-    if (value) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
-    window.history.replaceState({}, "", url);
-  }, []);
+  return <div className="app-shell hub-home">
+    <Header onUpload={() => { location.href = "/upload"; }} onQr={() => setShowQr(true)} />
+    <ScrollJourney />
+    <main id="main-content" className="narrative-flow">
+      <Hero stats={stats} onUpload={() => { location.href = "/upload"; }} />
+      <section className="pulse-band" aria-label="平台实时汇聚状态"><div className="page-shell pulse-band__inner"><div className="pulse-band__lead"><span className="live-dot" /><strong>集训影像持续汇聚中</strong></div><dl><div><Camera /><dt>照片</dt><dd>{stats.photos}</dd></div><div><Video /><dt>视频</dt><dd>{stats.videos}</dd></div><div><Images /><dt>共同记忆</dt><dd>{stats.media}</dd></div></dl><a className="text-button" href="/gallery">进入影像直播<ArrowUpRight /></a></div></section>
 
-  const selectGalleryCompany = useCallback((company: number) => {
-    setGalleryCompany(company);
-    updateUrl("company", company ? String(company) : undefined);
-  }, [updateUrl]);
+      <section className="hub-actions section"><div className="page-shell"><div className="section-heading"><span className="section-kicker">CHOOSE YOUR JOURNEY</span><h2>从这里，进入黄埔八期</h2><p>首页只负责分流，每个入口都有专属任务场景。</p></div><div className="hub-action-grid">
+        <a href="/gallery"><Images /><span><strong>影像直播</strong><small>连续浏览全营照片与视频</small></span><ArrowUpRight /></a>
+        <a href="/#companies"><span className="hub-action-number">16</span><span><strong>连队星图</strong><small>探索每支连队的专属风采</small></span><ArrowUpRight /></a>
+        <a href="/upload"><Camera /><span><strong>上传此刻</strong><small>名单验证后贡献你的镜头</small></span><ArrowUpRight /></a>
+        <a href="/staff"><ShieldCheck /><span><strong>幕后守护</strong><small>看见工作人员与辅导老师</small></span><ArrowUpRight /></a>
+      </div></div></section>
 
-  const closeUpload = useCallback(() => setShowUpload(false), []);
-  const closeQr = useCallback(() => setShowQr(false), []);
-  const closeMedia = useCallback(() => {
-    setActiveMediaId(null);
-    updateUrl("moment");
-  }, [updateUrl]);
+      <CompanyShowcase selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onViewCompany={(id) => { location.href = `/company/${id}`; }} media={media} />
 
-  const openMedia = useCallback((item: MediaItem) => {
-    setActiveMediaId(item.id);
-    updateUrl("moment", item.id);
-  }, [updateUrl]);
+      <section className="section home-live-preview"><div className="page-shell"><div className="section-heading section-heading--split"><div><span className="section-kicker">LIVE NOW</span><h2>此刻，正在汇聚</h2></div><a className="button button--outline" href="/gallery">进入完整直播流<ArrowUpRight /></a></div><div className="home-preview-grid">{media.slice(0, 6).map((item) => <a href={`/gallery?moment=${encodeURIComponent(item.id)}`} key={item.id}>{item.type === "video" ? <video src={item.url} muted playsInline /> : <img src={item.url} alt={item.caption} />}<span><small>{categoryLabel(item.categoryId)}</small><strong>{item.caption}</strong></span></a>)}</div></div></section>
 
-  const activeIndex = useMemo(() => media.findIndex((item) => item.id === activeMediaId), [activeMediaId, media]);
-  const activeMedia = activeIndex >= 0 ? media[activeIndex] : null;
+      <section className="section staff-care-section"><div className="page-shell staff-care-card"><div><span className="section-kicker">CARE BEHIND THE MOMENTS</span><h2>每一份守护，都值得被看见</h2><p>特别记录辅导老师与工作人员在集训背后的耐心陪伴、组织保障与温暖付出。</p><a className="button button--outline" href="/staff">进入工作人员专区</a></div><div className="staff-care-count"><strong>{media.filter((item) => item.categoryId === 17).length}</strong><span>个幕后瞬间</span></div></div></section>
 
-  const goToMedia = useCallback((index: number) => {
-    const item = media[index];
-    if (!item) return;
-    setActiveMediaId(item.id);
-    updateUrl("moment", item.id);
-  }, [media, updateUrl]);
-
-  const handleLike = useCallback(async (item: MediaItem) => {
-    setMedia((current) => current.map((entry) => entry.id === item.id ? { ...entry, likes: entry.likes + 1 } : entry));
-    try {
-      const result = await likeMedia(item.id);
-      setMedia((current) => current.map((entry) => entry.id === item.id ? { ...entry, likes: result.likes } : entry));
-    } catch (error) {
-      setMedia((current) => current.map((entry) => entry.id === item.id ? { ...entry, likes: Math.max(0, entry.likes - 1) } : entry));
-      showNotice(error instanceof Error ? error.message : "点赞未能送达");
-    }
-  }, [showNotice]);
-
-  const handleUploaded = useCallback((items: MediaItem[]) => {
-    setMedia((current) => [...items, ...current]);
-    setStats((current) => ({
-      ...current,
-      media: current.media + items.length,
-      photos: current.photos + items.filter((item) => item.type === "photo").length,
-      videos: current.videos + items.filter((item) => item.type === "video").length
-    }));
-    if (items[0]) {
-      if (items[0].company <= 16) setShowcaseCompany(items[0].company);
-      selectGalleryCompany(items[0].company);
-    }
-    showNotice(`${items.length} 个集训瞬间已成功汇聚`);
-  }, [selectGalleryCompany, showNotice]);
-
-  return (
-    <div className="app-shell">
-      <Header onUpload={readOnly ? undefined : () => setShowUpload(true)} onQr={() => setShowQr(true)} />
-      <ScrollJourney />
-      <main id="main-content" className="narrative-flow">
-        <Hero stats={stats} onUpload={readOnly ? undefined : () => setShowUpload(true)} />
-
-        <section className="pulse-band" aria-label="平台实时汇聚状态">
-          <div className="page-shell pulse-band__inner">
-            <div className="pulse-band__lead">
-              <span className="live-dot" aria-hidden="true" />
-              <strong>集训影像持续汇聚中</strong>
-            </div>
-            <dl>
-              <div><Camera aria-hidden="true" /><dt>照片</dt><dd>{stats.photos}</dd></div>
-              <div><Video aria-hidden="true" /><dt>视频</dt><dd>{stats.videos}</dd></div>
-              <div><Images aria-hidden="true" /><dt>共同记忆</dt><dd>{stats.media}</dd></div>
-            </dl>
-            <button type="button" className="text-button" onClick={() => setShowQr(true)}>
-              分享给家人朋友<ArrowUpRight aria-hidden="true" />
-            </button>
-          </div>
-        </section>
-
-        <CompanyShowcase
-          selectedCompany={showcaseCompany}
-          onSelectCompany={setShowcaseCompany}
-          onViewCompany={(company) => {
-            selectGalleryCompany(company);
-            setShowcaseCompany(company);
-          }}
-          media={media}
-        />
-        <section className="section staff-care-section">
-          <div className="page-shell staff-care-card">
-            <div><span className="section-kicker">CARE BEHIND THE MOMENTS</span><h2>每一份守护，都值得被看见</h2><p>特别记录辅导老师与工作人员在集训背后的耐心陪伴、组织保障与温暖付出。</p><button className="button button--outline" onClick={() => selectGalleryCompany(17)}>查看工作人员风采</button></div>
-            <div className="staff-care-count"><strong>{media.filter((item) => item.categoryId === 17).length}</strong><span>个幕后瞬间</span></div>
-          </div>
-        </section>
-        <MediaGallery
-          media={media}
-          selectedCompany={galleryCompany}
-          onCompanyChange={selectGalleryCompany}
-          onOpen={openMedia}
-          onLike={handleLike}
-          onUpload={readOnly ? undefined : () => setShowUpload(true)}
-        />
-        <section className="section ranking-section" id="ranking">
-          <div className="page-shell">
-            <div className="section-heading"><span className="section-kicker">COMPANY RANKING</span><h2>连队风采榜</h2><p>按当前公开有效素材数量实时统计，工作人员不参与排名。</p></div>
-            <div className="ranking-grid">{stats.ranking.slice(0, 16).map((item, index) => <article className="ranking-card" key={item.categoryId}><strong>{String(index + 1).padStart(2, "0")}</strong><span>{item.name}</span><em>{item.count} 个瞬间</em></article>)}</div>
-          </div>
-        </section>
-        <OfficialStories />
-        <GrowthTimeline onUpload={readOnly ? undefined : () => setShowUpload(true)} />
-      </main>
-
-      <footer className="site-footer">
-        <div className="page-shell site-footer__top">
-          <div>
-            <BrandMark inverse />
-            <p>记录昂扬向上的集训过程，见证每一位新曙光人的成长与担当。</p>
-          </div>
-          <div className="site-footer__trust">
-            <ShieldCheck aria-hidden="true" />
-            <span><strong>影像友好公约</strong>上传前请确认已获得影像中人物授权</span>
-          </div>
-        </div>
-        <div className="page-shell site-footer__bottom">
-          <span>2026中科曙光集团应届生训战营 · 黄埔八期</span>
-          <span>示例素材来源见 <a href="/demo/CREDITS.md" target="_blank" rel="noreferrer">影像说明</a>，正式上线前请替换为已授权内容</span>
-        </div>
-      </footer>
-
-      <MobileNav onUpload={readOnly ? undefined : () => setShowUpload(true)} onQr={() => setShowQr(true)} />
-      <SugonCursor />
-
-      <AnimatePresence>
-        {!readOnly && showUpload && (
-          <UploadDialog
-            key="upload"
-            onClose={closeUpload}
-            onUploaded={handleUploaded}
-            config={config}
-            initialCompany={galleryCompany || showcaseCompany}
-          />
-        )}
-        {showQr && <QrDialog key="qr" onClose={closeQr} onNotice={showNotice} />}
-        {activeMedia && (
-          <MediaLightbox
-            key="lightbox"
-            item={activeMedia}
-            hasPrevious={activeIndex > 0}
-            hasNext={activeIndex < media.length - 1}
-            onPrevious={() => goToMedia(activeIndex - 1)}
-            onNext={() => goToMedia(activeIndex + 1)}
-            onClose={closeMedia}
-            onLike={handleLike}
-            onNotice={showNotice}
-          />
-        )}
-      </AnimatePresence>
-
-      <div className={`toast ${notice ? "is-visible" : ""}`} role="status" aria-live="polite" aria-atomic="true">
-        {notice}
-      </div>
-    </div>
-  );
+      <section className="section ranking-section"><div className="page-shell"><div className="section-heading"><span className="section-kicker">TOP 3 / LIVE</span><h2>连队风采榜</h2><p>首页只展示前三名，完整影像请进入直播流。</p></div><div className="ranking-grid ranking-grid--top">{stats.ranking.slice(0, 3).map((item, index) => <a href={`/company/${item.categoryId}`} className="ranking-card" key={item.categoryId}><strong>{String(index + 1).padStart(2, "0")}</strong><span>{item.name}</span><em>{item.count} 个瞬间</em></a>)}</div></div></section>
+    </main>
+    <footer className="site-footer"><div className="page-shell site-footer__top"><div><BrandMark inverse /><p>荣聚曙光，梦想启航。</p></div><div className="site-footer__trust"><ShieldCheck /><span><strong>影像友好公约</strong>上传前请确认已获得影像中人物授权</span></div></div><div className="page-shell site-footer__bottom"><span>2026中科曙光集团应届生训战营 · 黄埔八期</span><span>Camp Gallery</span></div></footer>
+    <MobileNav onUpload={() => { location.href = "/upload"; }} onQr={() => setShowQr(true)} />
+    <SugonCursor />
+    {showQr && <QrDialog onClose={() => setShowQr(false)} onNotice={showNotice} />}
+    <div className={`toast ${notice ? "is-visible" : ""}`} role="status">{notice}</div>
+  </div>;
 }

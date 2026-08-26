@@ -8,10 +8,10 @@ interface HeaderProps {
 }
 
 const navItems = [
-  ["#home", "首页"],
-  ["#companies", "连队风采"],
-  ["#gallery", "集训瞬间"],
-  ["#timeline", "成长足迹"]
+  ["/", "首页"],
+  ["/#companies", "连队星图"],
+  ["/gallery", "影像直播"],
+  ["/staff", "工作人员"]
 ] as const;
 
 export function Header({ onUpload, onQr }: HeaderProps) {
@@ -27,7 +27,7 @@ export function Header({ onUpload, onQr }: HeaderProps) {
   return (
     <header className={`site-header ${scrolled ? "site-header--scrolled" : ""}`}>
       <div className="site-header__inner">
-        <a href="#home" className="site-header__brand" aria-label="返回首页">
+        <a href="/" className="site-header__brand" aria-label="返回首页">
           <BrandMark inverse={!scrolled} />
           <span className="site-header__divider" aria-hidden="true" />
           <span className="site-header__title">黄埔八期</span>
