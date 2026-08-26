@@ -11,10 +11,10 @@ export function ScreenPage() {
   const current = ordered[index % Math.max(ordered.length, 1)];
   useEffect(() => { const load = async () => { const [m, s] = await Promise.all([fetchMedia(), fetchStats()]); setMedia(m.items); setStats(s); }; void load(); const refresh = setInterval(load, 30000); return () => clearInterval(refresh); }, []);
   useEffect(() => { if (paused || ordered.length < 2) return; const timer = setInterval(() => setIndex((value) => (value + 1) % ordered.length), current?.type === "video" ? 9000 : 6000); return () => clearInterval(timer); }, [current?.type, ordered.length, paused]);
-  if (!current) return <main className="screen-page screen-empty"><h1>曙光新星 · 集训纪实</h1><p>等待第一个精彩瞬间上传……</p></main>;
+  if (!current) return <main className="screen-page screen-empty"><h1>黄埔八期 · 荣聚曙光，梦想启航</h1><p>等待第一个精彩瞬间上传……</p></main>;
   return <main className="screen-page">
     <div className="screen-media">{current.type === "video" ? <video key={current.id} src={current.url} autoPlay playsInline muted={muted} /> : <img key={current.id} src={current.url} alt={current.caption} />}</div><div className="screen-shade" />
-    <header><strong>曙光新星 · 集训纪实</strong><span>{stats.media} 个共同记忆正在汇聚</span></header>
+    <header><strong>2026中科曙光集团应届生训战营 · 黄埔八期</strong><span>{stats.media} 个共同记忆正在汇聚</span></header>
     <section><small>{current.featured ? "精选瞬间 · " : ""}{categoryLabel(current.categoryId)}</small><h1>{current.caption}</h1><p>{index + 1} / {ordered.length}</p></section>
     <nav><button onClick={() => setPaused((value) => !value)}>{paused ? <Play /> : <Pause />}</button>{current.type === "video" && <button onClick={() => setMuted((value) => !value)}>{muted ? <VolumeX /> : <Volume2 />}</button>}<button onClick={() => document.documentElement.requestFullscreen?.()}><Maximize /></button></nav>
   </main>;

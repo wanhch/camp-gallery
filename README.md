@@ -1,40 +1,56 @@
-# 曙光新星 · 集训纪实
+# Camp Gallery
 
-面向中科曙光应届生实训的照片、视频汇聚与连队风采展示平台。包含 736 学员光点与 16 连队节点组成的实时 Canvas 集结场、连续滚动旅程、随机连队聚光、官方内容入口、移动端优先布局、媒体筛选、照片/视频上传、点赞、大图浏览、Web Share 与动态二维码。
+2026中科曙光集团应届生训战营 · 黄埔八期影像汇聚与展示平台。
 
-动态场景提供显式暂停控制并遵循 `prefers-reduced-motion`。Sugon 纸飞机光标只在精细指针设备上启用，触屏设备保留系统交互。
+> 荣聚曙光，梦想启航
 
-## 本地运行
+## 工程结构
+
+- `frontend/`：React 19 + TypeScript + Vite，独立开发和构建。
+- `backend/`：Express 5 + SQLite，独立开发、测试和部署。
+- `docs/`：需求基线与前后端 API 契约。
+
+## 国内镜像
+
+本机 npm 已配置为 `https://registry.npmmirror.com`。新环境可执行：
+
+```bash
+npm config set registry https://registry.npmmirror.com
+```
+
+## 安装与启动
 
 ```bash
 npm install
+npm --prefix frontend install
+npm --prefix backend install
 npm run dev
 ```
 
-- 网站：`http://localhost:5173`
-- API：`http://localhost:8787`
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8787`
+- 上传：`http://localhost:5173/upload`
+- 观看：`http://localhost:5173/gallery`
+- 管理：`http://localhost:5173/admin`
+- 大屏：`http://localhost:5173/screen`
 
-首次启动 API 时会自动创建 `storage/sugon-stars.db`，并将演示数据写入 SQLite。用户上传文件保存在 `storage/media/`。
+初始管理员密码按需求设为 `sugonhygon`。公网部署前必须在 `backend/.env` 中配置新的 `AUTH_SECRET`，密码和密钥均不得提交到 GitHub。
 
-## 生产运行
+## 验证
 
 ```bash
+npm run check
 npm run build
-npm start
+# 后端运行时：
+npm --prefix backend run test:smoke
 ```
 
-生产服务默认监听 `8787`，同时提供 API、上传文件和构建后的前端。
+冒烟测试覆盖名单验证、错误身份拒绝、真实上传、公开隐私、管理员审计、精选、隐藏、AI 演示和测试素材清理。
 
-## 环境变量
+## 数据
 
-| 变量 | 默认值 | 作用 |
-| --- | --- | --- |
-| `PORT` | `8787` | 生产服务端口 |
-| `UPLOAD_CODE` | 空 | 设置后，上传时必须填写共享集训口令 |
-| `MAX_FILE_MB` | `120` | 单个文件最大体积 |
+- SQLite：`backend/storage/camp-gallery.db`
+- 上传文件：`backend/storage/media/`
+- 两者均被 Git 忽略，部署时必须挂载持久化磁盘。
 
-公网部署时应把 `storage/` 挂载到持久化磁盘，并在反向代理层配置 HTTPS、请求频率限制与文件体积上限。二维码始终使用访问者当前打开的网站地址，无需额外配置。
-
-## 上线替换
-
-`public/demo/` 为可替换的演示照片，`public/official/` 保存带来源说明的公开内容封面。完整来源见 `public/demo/CREDITS.md`。正式发布前请替换为已获得参与者授权的真实素材，并将头部文字标识替换为内部提供的官方 Sugon SVG 品牌文件。
+详细需求见 [`docs/requirements.md`](docs/requirements.md)，接口见 [`docs/api.md`](docs/api.md)。

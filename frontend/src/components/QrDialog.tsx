@@ -37,7 +37,7 @@ export function QrDialog({ onClose, onNotice }: QrDialogProps) {
   const share = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "曙光新星 · 集训纪实", text: "一起看看我们的集训时刻", url: shareUrl });
+        await navigator.share({ title: "黄埔八期 · 集训纪实", text: "荣聚曙光，梦想启航", url: shareUrl });
       } catch {
         return;
       }

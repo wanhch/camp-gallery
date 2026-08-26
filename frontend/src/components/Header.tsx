@@ -30,7 +30,7 @@ export function Header({ onUpload, onQr }: HeaderProps) {
         <a href="#home" className="site-header__brand" aria-label="返回首页">
           <BrandMark inverse={!scrolled} />
           <span className="site-header__divider" aria-hidden="true" />
-          <span className="site-header__title">曙光新星</span>
+          <span className="site-header__title">黄埔八期</span>
         </a>
         <nav className="site-nav" aria-label="主要导航">
           {navItems.map(([href, label]) => (

@@ -55,11 +55,11 @@ export function Hero({ stats, onUpload }: HeroProps) {
       >
         <motion.div className="hero__eyebrow" variants={heroMotion} transition={{ duration: 0.55 }}>
           <span className="live-dot" aria-hidden="true" />
-          SUGON 2026 / NEW STARS ASSEMBLING
+          2026 中科曙光集团应届生训战营
         </motion.div>
         <motion.h1 id="hero-heading" variants={heroMotion} transition={{ duration: 0.68 }}>
-          曙光新星
-          <span>集训纪实</span>
+          黄埔八期
+          <span>荣聚曙光，梦想启航</span>
         </motion.h1>
         <motion.p className="hero__lead" variants={heroMotion} transition={{ duration: 0.68 }}>
           736 位新曙光人正在汇成 16 支并肩连队。每一个光点都是此刻的你，每一次连接都在写下我们的共同记忆。

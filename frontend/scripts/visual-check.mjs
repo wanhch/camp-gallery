@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.TEST_URL || "http://127.0.0.1:8787";
+const baseUrl = process.env.TEST_URL || "http://127.0.0.1:5173";
 const outputDir = new URL("../artifacts/visual/", import.meta.url);
 await mkdir(outputDir, { recursive: true });
 

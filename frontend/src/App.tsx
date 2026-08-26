@@ -22,7 +22,7 @@ const defaultConfig: PlatformConfig = { maxFileMb: 100, maxFiles: 20, aiMode: "d
 
 function readCompanyParam() {
   const value = Number(new URLSearchParams(window.location.search).get("company"));
-  return Number.isInteger(value) && value >= 1 && value <= 16 ? value : 0;
+  return Number.isInteger(value) && value >= 1 && value <= 17 ? value : 0;
 }
 
 interface AppProps { readOnly?: boolean; initialUpload?: boolean }
@@ -115,7 +115,7 @@ export default function App({ readOnly = false, initialUpload = false }: AppProp
       videos: current.videos + items.filter((item) => item.type === "video").length
     }));
     if (items[0]) {
-      setShowcaseCompany(items[0].company);
+      if (items[0].company <= 16) setShowcaseCompany(items[0].company);
       selectGalleryCompany(items[0].company);
     }
     showNotice(`${items.length} 个集训瞬间已成功汇聚`);
@@ -154,6 +154,12 @@ export default function App({ readOnly = false, initialUpload = false }: AppProp
           }}
           media={media}
         />
+        <section className="section staff-care-section">
+          <div className="page-shell staff-care-card">
+            <div><span className="section-kicker">CARE BEHIND THE MOMENTS</span><h2>每一份守护，都值得被看见</h2><p>特别记录辅导老师与工作人员在集训背后的耐心陪伴、组织保障与温暖付出。</p><button className="button button--outline" onClick={() => selectGalleryCompany(17)}>查看工作人员风采</button></div>
+            <div className="staff-care-count"><strong>{media.filter((item) => item.categoryId === 17).length}</strong><span>个幕后瞬间</span></div>
+          </div>
+        </section>
         <MediaGallery
           media={media}
           selectedCompany={galleryCompany}
@@ -184,7 +190,7 @@ export default function App({ readOnly = false, initialUpload = false }: AppProp
           </div>
         </div>
         <div className="page-shell site-footer__bottom">
-          <span>曙光新星 · 2026 应届生实训影像平台</span>
+          <span>2026中科曙光集团应届生训战营 · 黄埔八期</span>
           <span>示例素材来源见 <a href="/demo/CREDITS.md" target="_blank" rel="noreferrer">影像说明</a>，正式上线前请替换为已授权内容</span>
         </div>
       </footer>
