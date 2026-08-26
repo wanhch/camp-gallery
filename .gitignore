@@ -1,0 +1,9 @@
+node_modules/
+dist/
+storage/*.db
+storage/*.db-*
+storage/media/*
+!storage/media/.gitkeep
+.DS_Store
+npm-debug.log*
+artifacts/
