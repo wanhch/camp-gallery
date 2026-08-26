@@ -37,6 +37,7 @@ try {
 
   check(health.ok, "health failed");
   check(categories.items.length === 17, "expected 17 categories");
+  check(categories.items.find((item) => item.id === 15)?.name === "满月连", "company names were not synchronized");
   check(trainee.profile.name === "万浩川" && staff.profile.name === "田洪泉", "roster verification failed");
   check(invalidRejected, "invalid category should be rejected");
   check(!Object.hasOwn(publicMedia.items.find((item) => item.id === id), "uploaderName"), "public API leaked uploader name");

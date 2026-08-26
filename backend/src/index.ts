@@ -62,11 +62,20 @@ database.exec(`
 `);
 
 const insertCategory = database.prepare(`
-  INSERT OR IGNORE INTO categories (id, slug, name, number, kind, rankable)
+  INSERT INTO categories (id, slug, name, number, kind, rankable)
   VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(id) DO UPDATE SET
+    slug=excluded.slug, name=excluded.name, number=excluded.number,
+    kind=excluded.kind, rankable=excluded.rankable
 `);
+const companyNames = [
+  "芯算一连", "好运连连", "启梦·一键三连", "四海争光",
+  "曙未来", "金枕六连", "钢七连", "芯耀八连",
+  "九五至尊", "深藏blue连", "壹壹得胜", "快乐的勇敢连",
+  "最牛13连", "先锋连", "满月连", "赴曙先锋"
+] as const;
 for (let index = 1; index <= 16; index += 1) {
-  insertCategory.run(index, `company-${index}`, `第${index}连`, String(index).padStart(2, "0"), "company", 1);
+  insertCategory.run(index, `company-${index}`, companyNames[index - 1], String(index).padStart(2, "0"), "company", 1);
 }
 insertCategory.run(17, "staff", "工作人员／辅导老师", null, "staff", 0);
 
