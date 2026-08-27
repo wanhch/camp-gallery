@@ -1,33 +1,47 @@
-import { useEffect, useState } from "react";
-import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "motion/react";
 
 const stages = [
   { id: "home", index: "01", label: "集结" },
   { id: "companies", index: "02", label: "连队" },
-  { id: "gallery", index: "03", label: "影像" },
-  { id: "timeline", index: "04", label: "成长" }
+  { id: "live", index: "03", label: "影像" },
+  { id: "care", index: "04", label: "守护" },
+  { id: "ranking", index: "05", label: "榜单" }
 ] as const;
 
 export function ScrollJourney() {
   const reduceMotion = useReducedMotion();
-  const { scrollYProgress } = useScroll();
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 95, damping: 24, mass: 0.32 });
-  const progress = reduceMotion ? scrollYProgress : smoothProgress;
-  const [active, setActive] = useState("home");
+  const [active, setActive] = useState<string>("home");
+  const trackRef = useRef<HTMLElement>(null);
+  const mobileRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    const container = document.querySelector<HTMLElement>("[data-scroll-root]");
+    if (!container) return;
+
     const sections = stages
       .map((stage) => document.getElementById(stage.id))
       .filter((section): section is HTMLElement => Boolean(section));
     const observer = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (visible?.target.id) setActive(visible.target.id);
-    }, { rootMargin: "-28% 0px -58% 0px", threshold: [0, 0.08, 0.2, 0.5] });
-
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.55) setActive(entry.target.id);
+      });
+    }, { root: container, threshold: [0.55] });
     sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+
+    const updateProgress = () => {
+      const max = container.scrollHeight - container.clientHeight;
+      const progress = max > 0 ? Math.min(1, container.scrollTop / max) : 0;
+      if (trackRef.current) trackRef.current.style.transform = `scaleY(${progress})`;
+      if (mobileRef.current) mobileRef.current.style.transform = `scaleX(${progress})`;
+    };
+    updateProgress();
+    container.addEventListener("scroll", updateProgress, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      container.removeEventListener("scroll", updateProgress);
+    };
   }, []);
 
   const visit = (id: string) => {
@@ -36,9 +50,9 @@ export function ScrollJourney() {
 
   return (
     <>
-      <aside className="scroll-journey" aria-label="页面阅读进度">
+      <aside className="scroll-journey" aria-label="首页分屏导航">
         <span className="scroll-journey__track" aria-hidden="true">
-          <motion.i style={{ scaleY: progress }} />
+          <i ref={trackRef} />
         </span>
         {stages.map((stage) => (
           <button
@@ -54,7 +68,7 @@ export function ScrollJourney() {
         ))}
       </aside>
       <div className="scroll-journey-mobile" aria-hidden="true">
-        <motion.i style={{ scaleX: progress }} />
+        <i ref={mobileRef} />
       </div>
     </>
   );

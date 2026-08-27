@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileVideo, ImagePlus, LoaderCircle, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { fetchConfig, uploadMedia, verifyUploader } from "../api";
 import { categoryLabel, uploadCategories } from "../data/companies";
+import { Link } from "../router";
 import type { MediaItem, PlatformConfig, UploadProfile } from "../types";
 
 const defaultConfig: PlatformConfig = { maxFileMb: 100, maxFiles: 20, aiMode: "demo" };
@@ -22,7 +23,7 @@ export function UploadPage() {
   const reset = () => { setFiles([]); setCaption(""); setConsent(false); setProgress(0); setUploaded([]); setStep(2); };
 
   return <main className="upload-route">
-    <header className="upload-route-header"><a href="/"><ArrowLeft />返回首页</a><div><strong>2026中科曙光集团应届生训战营 · 黄埔八期</strong><span>上传中心</span></div><a href="/gallery">观看风采<ArrowRight /></a></header>
+    <header className="upload-route-header"><Link href="/"><ArrowLeft />返回首页</Link><div><strong>2026中科曙光集团应届生训战营 · 黄埔八期</strong><span>上传中心</span></div><Link href="/gallery">观看风采<ArrowRight /></Link></header>
     <div className="upload-route-layout">
       <aside><span className="section-kicker">UPLOAD JOURNEY</span><h1>你的镜头，<br />让共同记忆更完整。</h1><p>姓名仅用于名单验证和后台审计，不会在公开页面显示。</p><ol>{([[1,"验证身份"],[2,"选择并上传"],[3,"完成汇聚"]] as const).map(([value,label]) => <li className={step >= value ? "is-active" : ""} key={value}><span>{step > value ? <Check /> : value}</span><strong>{label}</strong></li>)}</ol></aside>
       <section className="upload-step-card">
@@ -30,7 +31,7 @@ export function UploadPage() {
 
         {step === 2 && <form onSubmit={submit}><span className="step-number">STEP 02</span><h2>上传你的集训瞬间</h2><div className="verified-banner"><CheckCircle2 /><span><strong>{profile?.name}</strong> · {profile ? categoryLabel(profile.categoryId) : ""}</span><button type="button" onClick={() => { setStep(1); setProfile(null); setToken(""); }}>重新验证</button></div><label className="drop-zone upload-page-drop"><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm" multiple onChange={(e: ChangeEvent<HTMLInputElement>) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; }} /><span className="drop-zone__icon"><ImagePlus /></span><strong>{files.length ? "继续添加照片或视频" : "从手机相册选择照片或视频"}</strong><small>单个不超过 {config.maxFileMb}MB，单次最多 {config.maxFiles} 个</small></label>{previews.length > 0 && <div className="upload-page-files">{previews.map(({ file, url }, index) => <article key={`${file.name}-${file.lastModified}`}>{file.type.startsWith("video/") ? <video src={url} muted /> : <img src={url} alt="" />}<span>{file.type.startsWith("video/") ? <FileVideo /> : <ImagePlus />}<strong>{file.name}</strong></span><button type="button" onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}><Trash2 /></button></article>)}</div>}<label className="field"><span>这一刻想说</span><textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={160} rows={3} placeholder="选填，也可在管理端使用 AI 文案演示" /></label><label className="consent-row"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>我确认已获得影像中人物授权，同意用于本次集训宣传展示。</span></label>{error && <p className="form-error">{error}</p>}{submitting && <div className="upload-progress"><span><i style={{ transform: `scaleX(${Math.max(.02, progress / 100)})` }} /></span><small>正在上传 {progress}%</small></div>}<div className="upload-route-actions"><button className="button button--primary button--large" disabled={submitting || !files.length}><Upload />{submitting ? "正在汇聚" : `汇聚 ${files.length || ""} 个瞬间`}</button></div></form>}
 
-        {step === 3 && <div className="upload-finished"><CheckCircle2 /><span className="step-number">STEP 03</span><h2>{uploaded.length} 个瞬间已成功汇聚</h2><p>素材已经进入公开展示墙。你可以立即查看，也可以继续上传。</p><div><a className="button button--primary button--large" href={`/gallery?category=${profile?.categoryId || ""}`}>去展示墙查看<ArrowRight /></a><button className="button button--outline button--large" onClick={reset}>继续上传</button></div></div>}
+        {step === 3 && <div className="upload-finished"><CheckCircle2 /><span className="step-number">STEP 03</span><h2>{uploaded.length} 个瞬间已成功汇聚</h2><p>素材已经进入公开展示墙。你可以立即查看，也可以继续上传。</p><div><Link className="button button--primary button--large" href={`/gallery?category=${profile?.categoryId || ""}`}>去展示墙查看<ArrowRight /></Link><button className="button button--outline button--large" onClick={reset}>继续上传</button></div></div>}
       </section>
     </div>
   </main>;

@@ -4,17 +4,23 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import dotenv from "dotenv";
+import { ZipArchive } from "archiver";
 import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
+import sharp from "sharp";
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(backendDir, ".env") });
 
 const storageDir = path.join(backendDir, "storage");
 const mediaDir = path.join(storageDir, "media");
+const frontendDistDir = path.resolve(backendDir, "../frontend/dist");
+const frontendPublicDir = path.resolve(backendDir, "../frontend/public");
+const frontendIndexPath = path.join(frontendDistDir, "index.html");
 const port = Number(process.env.PORT || 8787);
 const frontendOrigin = process.env.FRONTEND_ORIGIN?.trim() || "http://localhost:5173";
 const publicApiUrl = process.env.PUBLIC_API_URL?.replace(/\/$/, "") || "";
+const serveFrontend = process.env.SERVE_FRONTEND === "true";
 const maxFileMb = Math.max(1, Number(process.env.MAX_FILE_MB || 100));
 const maxFiles = Math.max(1, Math.min(20, Number(process.env.MAX_FILES || 20)));
 const adminPassword = process.env.ADMIN_PASSWORD || "sugonhygon";
@@ -103,6 +109,22 @@ const insertDemo = database.prepare(`
 `);
 demoRows.forEach((row, index) => insertDemo.run(row[0], row[1], row[2], row[3], new Date(Date.UTC(2026, 7, 25 - index, 8)).toISOString(), row[4], index < 3 ? 1 : 0));
 
+// 存量补生成：为历史上传的照片补齐缩略图（/demo/ 演示图与视频跳过；失败仅记录日志）
+void (async () => {
+  const missing = database.prepare("SELECT id, url FROM media WHERE type='photo' AND thumbnail_url IS NULL AND url LIKE '/uploads/%' AND status!='deleted'").all() as { id: string; url: string }[];
+  if (!missing.length) return;
+  const updateThumb = database.prepare("UPDATE media SET thumbnail_url=? WHERE id=?");
+  let generated = 0;
+  for (const row of missing) {
+    const fileName = path.basename(row.url);
+    const filePath = path.join(mediaDir, fileName);
+    if (!existsSync(filePath)) continue;
+    const thumb = await makeThumbnail(filePath, fileName);
+    if (thumb) { updateThumb.run(thumb, row.id); generated += 1; }
+  }
+  if (generated) console.log(`已为 ${generated} 张历史照片补齐缩略图`);
+})();
+
 type Role = "uploader" | "admin";
 interface AuthPayload { role: Role; name?: string; categoryId?: number; exp: number }
 interface AuthedRequest extends Request { auth?: AuthPayload }
@@ -146,6 +168,28 @@ function cleanText(value: unknown, fallback: string, maxLength: number): string 
   return (text || fallback).slice(0, maxLength);
 }
 
+function safeArchivePart(value: unknown, fallback: string): string {
+  const text = cleanText(value, fallback, 96)
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/^\.+|\.+$/g, "")
+    .trim();
+  return text || fallback;
+}
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? "").replace(/\r?\n/g, " ");
+  if (/^[=+\-@]/.test(text.trimStart())) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function resolveExportSource(rawUrl: string): string | null {
+  if (rawUrl.startsWith("/uploads/")) return path.join(mediaDir, path.basename(rawUrl));
+  if (!rawUrl.startsWith("/demo/")) return null;
+  const relativeUrl = rawUrl.replace(/^\/+/, "");
+  const builtFile = path.join(frontendDistDir, relativeUrl);
+  return existsSync(builtFile) ? builtFile : path.join(frontendPublicDir, relativeUrl);
+}
+
 function safeEqual(value: string, expected: string): boolean {
   const left = Buffer.from(value);
   const right = Buffer.from(expected);
@@ -157,6 +201,22 @@ const allowedMimeTypes = new Map([
   ["image/heic", ".heic"], ["image/heif", ".heif"], ["video/mp4", ".mp4"],
   ["video/quicktime", ".mov"], ["video/webm", ".webm"]
 ]);
+
+/** 为图片生成 1080px WebP 缩略图（.rotate() 修正手机 EXIF 方向）；HEIC 等无法解码时返回 null，不影响上传。 */
+async function makeThumbnail(sourcePath: string, sourceName: string): Promise<string | null> {
+  const thumbName = `${sourceName}.thumb.webp`;
+  try {
+    await sharp(sourcePath)
+      .rotate()
+      .resize({ width: 1080, withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toFile(path.join(mediaDir, thumbName));
+    return `/uploads/${thumbName}`;
+  } catch (error) {
+    console.warn(`缩略图生成失败: ${sourceName}`, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
 const upload = multer({
   storage: multer.diskStorage({
     destination: mediaDir,
@@ -257,7 +317,7 @@ app.get("/api/v1/media", (request, response) => {
   response.json({ items: rows.map((row) => serializePublic(row, request)), total: count.total });
 });
 
-app.post("/api/v1/media", requireRole("uploader"), upload.array("files", maxFiles), (request: AuthedRequest, response) => {
+app.post("/api/v1/media", requireRole("uploader"), upload.array("files", maxFiles), async (request: AuthedRequest, response: Response) => {
   const files = request.files as Express.Multer.File[];
   if (!files?.length || !request.auth?.name || !request.auth.categoryId) {
     response.status(400).json({ message: "请至少选择一张照片或一段视频" }); return;
@@ -268,21 +328,37 @@ app.post("/api/v1/media", requireRole("uploader"), upload.array("files", maxFile
   const insert = database.prepare(`INSERT INTO media
     (id,url,type,thumbnail_url,category_id,uploader_name,caption,ai_title,created_at,likes,is_demo,status,featured)
     VALUES (?,?,?,NULL,?,?,?,NULL,?,0,0,'public',0)`);
-  const created: ReturnType<typeof serializePublic>[] = [];
+  const rows = files.map((file, index) => ({
+    id: randomUUID(),
+    url: `/uploads/${file.filename}`,
+    type: (file.mimetype.startsWith("video/") ? "video" : "photo") as "video" | "photo",
+    thumbnail_url: null as string | null,
+    category_id: categoryId,
+    caption,
+    created_at: new Date(Date.now() + index).toISOString(),
+    likes: 0,
+    is_demo: 0,
+    featured: 0
+  }));
   database.exec("BEGIN IMMEDIATE");
   try {
-    files.forEach((file, index) => {
-      const row = { id: randomUUID(), url: `/uploads/${file.filename}`, type: file.mimetype.startsWith("video/") ? "video" : "photo", category_id: categoryId, caption, created_at: new Date(Date.now() + index).toISOString(), likes: 0, is_demo: 0, featured: 0, thumbnail_url: null };
-      insert.run(row.id, row.url, row.type, categoryId, uploaderName, caption, row.created_at);
-      created.push(serializePublic(row, request));
-    });
+    rows.forEach((row) => insert.run(row.id, row.url, row.type, categoryId, uploaderName, caption, row.created_at));
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
     files.forEach((file) => { if (existsSync(file.path)) unlinkSync(file.path); });
     throw error;
   }
-  response.status(201).json({ items: created });
+  // 缩略图在事务提交后生成：失败只影响该图的缩略图，不影响上传结果
+  const updateThumb = database.prepare("UPDATE media SET thumbnail_url=? WHERE id=?");
+  await Promise.all(files.map(async (file, index) => {
+    if (!file.mimetype.startsWith("image/")) return;
+    const thumb = await makeThumbnail(file.path, file.filename);
+    if (!thumb) return;
+    rows[index].thumbnail_url = thumb;
+    updateThumb.run(thumb, rows[index].id);
+  }));
+  response.status(201).json({ items: rows.map((row) => serializePublic(row, request)) });
 });
 
 app.post("/api/v1/media/:id/like", (request, response) => {
@@ -294,7 +370,110 @@ app.post("/api/v1/media/:id/like", (request, response) => {
 
 app.get("/api/v1/admin/media", requireRole("admin"), (request, response) => {
   const rows = database.prepare(`SELECT m.*, c.name category_name FROM media m JOIN categories c ON c.id=m.category_id WHERE m.status!='deleted' ORDER BY m.created_at DESC`).all() as Record<string, unknown>[];
-  response.json({ items: rows.map((row) => ({ ...serializePublic(row, request), uploaderName: row.uploader_name, status: row.status, categoryName: row.category_name })) });
+  response.json({ items: rows.map((row) => ({ ...serializePublic(row, request), originalCaption: row.caption, aiTitle: row.ai_title, uploaderName: row.uploader_name, status: row.status, categoryName: row.category_name })) });
+});
+
+app.get("/api/v1/admin/export", requireRole("admin"), async (request, response, next) => {
+  const rawCategoryId = cleanText(request.query.categoryId, "", 4);
+  const categoryId = rawCategoryId ? Number(rawCategoryId) : null;
+  const status = cleanText(request.query.status, "all", 16);
+  const query = cleanText(request.query.q, "", 100);
+
+  if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId < 1 || categoryId > 17)) {
+    response.status(400).json({ message: "导出分类无效" });
+    return;
+  }
+  if (!new Set(["all", "public", "hidden"]).has(status)) {
+    response.status(400).json({ message: "导出状态无效" });
+    return;
+  }
+
+  const conditions = ["m.status!='deleted'"];
+  const parameters: (string | number)[] = [];
+  if (categoryId !== null) {
+    conditions.push("m.category_id=?");
+    parameters.push(categoryId);
+  }
+  if (status !== "all") {
+    conditions.push("m.status=?");
+    parameters.push(status);
+  }
+  if (query) {
+    conditions.push(`(
+      m.caption LIKE ? OR COALESCE(m.ai_title, '') LIKE ? OR m.uploader_name LIKE ? OR
+      c.name LIKE ? OR m.url LIKE ? OR m.id LIKE ?
+    )`);
+    const pattern = `%${query}%`;
+    parameters.push(pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+
+  type ExportRow = {
+    id: string;
+    url: string;
+    type: "photo" | "video";
+    category_id: number;
+    uploader_name: string;
+    caption: string;
+    ai_title: string | null;
+    created_at: string;
+    likes: number;
+    status: "public" | "hidden";
+    featured: number;
+    category_name: string;
+  };
+  const rows = database.prepare(`
+    SELECT m.*, c.name category_name
+    FROM media m JOIN categories c ON c.id=m.category_id
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY c.id, m.created_at DESC
+  `).all(...parameters) as unknown as ExportRow[];
+  if (!rows.length) {
+    response.status(404).json({ message: "当前检索条件下没有可导出的素材" });
+    return;
+  }
+
+  const exportItems = rows.map((row) => {
+    const sourcePath = resolveExportSource(row.url);
+    const available = Boolean(sourcePath && existsSync(sourcePath));
+    const folder = row.category_id === 17
+      ? `STAFF-${safeArchivePart(row.category_name, "staff")}`
+      : `${String(row.category_id).padStart(2, "0")}-${safeArchivePart(row.category_name, `company-${row.category_id}`)}`;
+    const originalName = safeArchivePart(path.basename(row.url), `${row.id}.${row.type === "photo" ? "jpg" : "mp4"}`);
+    const day = row.created_at.slice(0, 10) || "unknown-date";
+    const archivePath = path.posix.join(folder, `${day}_${row.id.slice(0, 8)}_${originalName}`);
+    return { row, sourcePath, available, archivePath };
+  });
+
+  const manifestHeader = ["素材ID", "连队/分类", "分类ID", "上传者", "类型", "文案", "AI文案", "状态", "精选", "点赞数", "上传时间", "压缩包路径", "源文件可用"].map(csvCell).join(",");
+  const manifestRows = exportItems.map(({ row, archivePath, available }) => [
+    row.id, row.category_name, row.category_id, row.uploader_name,
+    row.type === "photo" ? "照片" : "视频", row.caption, row.ai_title || "",
+    row.status === "public" ? "公开" : "隐藏", row.featured ? "是" : "否",
+    row.likes, row.created_at, archivePath, available ? "是" : "否"
+  ].map(csvCell).join(","));
+  const manifest = `\uFEFF${[manifestHeader, ...manifestRows].join("\r\n")}`;
+
+  const scope = categoryId === null ? "all" : `category-${categoryId}`;
+  const fileName = `camp-gallery-${scope}-${new Date().toISOString().slice(0, 10)}.zip`;
+  response.status(200);
+  response.header("Content-Type", "application/zip");
+  response.header("Content-Disposition", `attachment; filename="${fileName}"`);
+  response.header("Cache-Control", "no-store");
+  response.header("X-Export-Count", String(rows.length));
+
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  archive.on("warning", (error) => console.warn("导出压缩包警告", error.message));
+  archive.on("error", (error) => response.destroy(error));
+  archive.pipe(response);
+  for (const item of exportItems) {
+    if (item.available && item.sourcePath) archive.file(item.sourcePath, { name: item.archivePath });
+  }
+  archive.append(manifest, { name: "素材清单.csv" });
+  try {
+    await archive.finalize();
+  } catch (error) {
+    if (!response.headersSent) next(error);
+  }
 });
 
 app.patch("/api/v1/admin/media/:id", requireRole("admin"), (request, response) => {
@@ -321,15 +500,32 @@ app.post("/api/v1/admin/media/:id/ai", requireRole("admin"), (request, response)
 
 app.delete("/api/v1/admin/media/:id", requireRole("admin"), (request, response) => {
   const id = String(request.params.id);
-  const row = database.prepare("SELECT url,is_demo FROM media WHERE id=? AND status!='deleted'").get(id) as { url: string; is_demo: number } | undefined;
+  const row = database.prepare("SELECT url,thumbnail_url,is_demo FROM media WHERE id=? AND status!='deleted'").get(id) as { url: string; thumbnail_url: string | null; is_demo: number } | undefined;
   if (!row) { response.status(404).json({ message: "素材不存在" }); return; }
   database.prepare("UPDATE media SET status='deleted', featured=0 WHERE id=?").run(id);
   if (!row.is_demo && row.url.startsWith("/uploads/")) {
     const filePath = path.join(mediaDir, path.basename(row.url));
     if (existsSync(filePath)) unlinkSync(filePath);
+    if (row.thumbnail_url?.startsWith("/uploads/")) {
+      const thumbPath = path.join(mediaDir, path.basename(row.thumbnail_url));
+      if (existsSync(thumbPath)) unlinkSync(thumbPath);
+    }
   }
   response.status(204).end();
 });
+
+if (serveFrontend) {
+  if (!existsSync(frontendIndexPath)) throw new Error(`Frontend build not found at ${frontendIndexPath}`);
+  app.use(express.static(frontendDistDir, { index: false, maxAge: "30d", immutable: true }));
+  app.use((request, response, next) => {
+    if (request.method !== "GET" || request.path.startsWith("/api/") || request.path.startsWith("/uploads/")) {
+      next();
+      return;
+    }
+    response.header("Cache-Control", "no-store");
+    response.sendFile(frontendIndexPath);
+  });
+}
 
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
   const message = error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"

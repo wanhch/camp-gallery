@@ -1,0 +1,17 @@
+[Unit]
+Description=Camp Gallery demo web application
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/camp-gallery
+EnvironmentFile=/home/ubuntu/camp-gallery/backend/.env
+ExecStart=/usr/bin/node /home/ubuntu/camp-gallery/backend/dist/index.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -30,6 +30,8 @@ check(id, "upload did not return an item");
 try {
   const publicMedia = await json("/media?categoryId=10");
   const adminMedia = await json("/admin/media", { headers: { authorization: `Bearer ${admin.token}` } });
+  const exportResponse = await fetch(`${base}/admin/export?categoryId=10&q=${encodeURIComponent("接口联调")}`, { headers: { authorization: `Bearer ${admin.token}` } });
+  const exportBytes = new Uint8Array(await exportResponse.arrayBuffer());
   const ai = await postJson(`/admin/media/${id}/ai`, {}, admin.token);
   const featured = await json(`/admin/media/${id}`, { method: "PATCH", headers: { authorization: `Bearer ${admin.token}`, "content-type": "application/json" }, body: JSON.stringify({ featured: true }) });
   await json(`/admin/media/${id}`, { method: "PATCH", headers: { authorization: `Bearer ${admin.token}`, "content-type": "application/json" }, body: JSON.stringify({ status: "hidden" }) });
@@ -42,9 +44,11 @@ try {
   check(invalidRejected, "invalid category should be rejected");
   check(!Object.hasOwn(publicMedia.items.find((item) => item.id === id), "uploaderName"), "public API leaked uploader name");
   check(adminMedia.items.some((item) => item.id === id && item.uploaderName === "万浩川"), "admin cannot see uploader audit field");
+  check(exportResponse.ok && exportResponse.headers.get("content-type")?.includes("application/zip"), "filtered admin export did not return a ZIP");
+  check(exportBytes[0] === 0x50 && exportBytes[1] === 0x4b && Number(exportResponse.headers.get("x-export-count")) >= 1, "admin export ZIP is invalid or empty");
   check(ai.provider === "demo" && featured.item.featured, "AI demo or featured flow failed");
   check(!afterHide.items.some((item) => item.id === id), "hidden media remained public");
-  console.log("Smoke test passed: roster, upload, privacy, admin, AI demo and visibility state.");
+  console.log("Smoke test passed: roster, upload, privacy, admin export, AI demo and visibility state.");
 } finally {
   await json(`/admin/media/${id}`, { method: "DELETE", headers: { authorization: `Bearer ${admin.token}` } });
 }

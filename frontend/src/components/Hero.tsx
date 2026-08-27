@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowDown, Camera, Network, Pause, Play, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { PlatformStats } from "../types";
@@ -7,6 +7,7 @@ import { DawnCanvas } from "./DawnCanvas";
 interface HeroProps {
   stats: PlatformStats;
   onUpload?: () => void;
+  children?: ReactNode;
 }
 
 const heroMotion = {
@@ -14,7 +15,7 @@ const heroMotion = {
   visible: { opacity: 1, y: 0 }
 };
 
-export function Hero({ stats, onUpload }: HeroProps) {
+export function Hero({ stats, onUpload, children }: HeroProps) {
   const reduceMotion = useReducedMotion();
   const [scenePaused, setScenePaused] = useState(false);
 
@@ -95,6 +96,7 @@ export function Hero({ stats, onUpload }: HeroProps) {
         <span>向下，遇见每一支队伍</span>
         <ArrowDown aria-hidden="true" />
       </button>
+      {children}
     </section>
   );
 }

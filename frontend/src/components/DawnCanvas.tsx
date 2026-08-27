@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { companies } from "../data/companies";
 
 interface DawnCanvasProps {
   paused?: boolean;
@@ -117,12 +118,14 @@ export function DawnCanvas({ paused = false }: DawnCanvasProps) {
       context.fillStyle = glow;
       context.fillRect(0, 0, width, height);
 
-      for (const point of dust) {
-        const drift = reduceMotion || paused ? 0 : Math.sin(time * 0.00016 + point.x * 10) * 4;
-        context.beginPath();
-        context.arc(point.x * width, point.y * height + drift, point.size, 0, Math.PI * 2);
-        context.fillStyle = `rgba(214,226,219,${point.alpha})`;
-        context.fill();
+      if (!compact) {
+        for (const point of dust) {
+          const drift = reduceMotion || paused ? 0 : Math.sin(time * 0.00016 + point.x * 10) * 4;
+          context.beginPath();
+          context.arc(point.x * width, point.y * height + drift, point.size, 0, Math.PI * 2);
+          context.fillStyle = `rgba(214,226,219,${point.alpha})`;
+          context.fill();
+        }
       }
 
       context.save();
@@ -182,7 +185,9 @@ export function DawnCanvas({ paused = false }: DawnCanvasProps) {
         context.fill();
       });
 
-      for (const light of lights) {
+      // 移动端光点减半（368 个），降低每帧绘制开销
+      for (let lightIndex = 0; lightIndex < lights.length; lightIndex += compact ? 2 : 1) {
+        const light = lights[lightIndex];
         const hub = hubs[light.company];
         const rgb = companyRgb[light.company % companyRgb.length];
         const orbit = light.angle + (reduceMotion || paused ? 0.45 : time * 0.00016 * light.speed);
@@ -220,10 +225,10 @@ export function DawnCanvas({ paused = false }: DawnCanvasProps) {
         context.arc(hub.x, hub.y, 3.1, 0, Math.PI * 2);
         context.fillStyle = `rgba(${rgb},0.96)`;
         context.fill();
-        context.fillStyle = "rgba(241,245,242,0.62)";
-        context.font = `${compact ? 8 : 9}px Outfit, sans-serif`;
+        context.fillStyle = "rgba(241,245,242,0.72)";
+        context.font = `${compact ? 9 : 11}px "Outfit", "Noto Sans SC", "PingFang SC", sans-serif`;
         context.textAlign = "center";
-        context.fillText(String(company + 1).padStart(2, "0"), hub.x, hub.y - 12);
+        context.fillText(companies[company].name, hub.x, hub.y - 13);
       });
 
       const corePulse = reduceMotion || paused ? 0.5 : (Math.sin(time * 0.0011) + 1) / 2;
@@ -239,6 +244,14 @@ export function DawnCanvas({ paused = false }: DawnCanvasProps) {
       context.arc(coreX, coreY, 3.6, 0, Math.PI * 2);
       context.fillStyle = "rgba(255,244,225,0.98)";
       context.fill();
+      context.save();
+      context.fillStyle = "rgba(255,244,225,0.9)";
+      context.font = `${compact ? 10 : 12}px "Outfit", "Noto Sans SC", "PingFang SC", sans-serif`;
+      context.textAlign = "center";
+      context.shadowColor = "rgba(8,11,10,0.9)";
+      context.shadowBlur = 6;
+      context.fillText("中科曙光", coreX, coreY + (compact ? 22 : 26));
+      context.restore();
       context.restore();
 
       if (!compact) {

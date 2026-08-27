@@ -1,131 +1,126 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, Images, Shuffle, Users } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { companies, getCompany } from "../data/companies";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Images, Shuffle, Users } from "lucide-react";
+import { useReducedMotion } from "motion/react";
+import { companies } from "../data/companies";
 import type { MediaItem } from "../types";
 
 interface CompanyShowcaseProps {
-  selectedCompany: number;
-  onSelectCompany: (company: number) => void;
-  onViewCompany: (company: number) => void;
   media: MediaItem[];
+  onViewCompany: (company: number) => void;
 }
 
-export function CompanyShowcase({ selectedCompany, onSelectCompany, onViewCompany, media }: CompanyShowcaseProps) {
-  const company = getCompany(selectedCompany);
+export function CompanyShowcase({ media, onViewCompany }: CompanyShowcaseProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
   const reduceMotion = useReducedMotion();
-  const companyMedia = media.filter((item) => item.company === company.id);
-  const [spotlighting, setSpotlighting] = useState(false);
-  const spotlightTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => () => window.clearInterval(spotlightTimer.current), []);
+  const momentCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    media.forEach((item) => counts.set(item.company, (counts.get(item.company) || 0) + 1));
+    return counts;
+  }, [media]);
 
-  const handleViewMedia = () => {
-    onViewCompany(company.id);
-    document.querySelector("#gallery")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+  const scrollToIndex = (index: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const clamped = Math.max(0, Math.min(companies.length - 1, index));
+    track.scrollTo({ left: clamped * track.clientWidth, behavior: reduceMotion ? "auto" : "smooth" });
   };
 
-  const spotlightCompany = () => {
-    if (spotlighting) return;
-    setSpotlighting(true);
-    let tick = 0;
-    spotlightTimer.current = window.setInterval(() => {
-      tick += 1;
-      const next = ((selectedCompany - 1 + tick * 5 + Math.floor(tick / 3) * 2) % companies.length) + 1;
-      onSelectCompany(next);
-      if (tick >= (reduceMotion ? 1 : 8)) {
-        window.clearInterval(spotlightTimer.current);
-        setSpotlighting(false);
-      }
-    }, reduceMotion ? 30 : 92);
+  const handleScroll = () => {
+    const track = trackRef.current;
+    if (!track || !track.clientWidth) return;
+    const index = Math.round(track.scrollLeft / track.clientWidth);
+    setActive((current) => (current === index ? current : index));
+  };
+
+  const spotlight = () => {
+    let next = Math.floor(Math.random() * companies.length);
+    if (next === active) next = (next + 5) % companies.length;
+    scrollToIndex(next);
   };
 
   return (
-    <section className="company-section section" id="companies" aria-labelledby="companies-heading">
-      <div className="page-shell">
-        <motion.div
-          className="section-heading section-heading--split"
-          initial={reduceMotion ? false : { opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: reduceMotion ? 0 : 0.62, ease: [0.22, 1, 0.36, 1] }}
-        >
+    <div className="company-showcase">
+      <div className="page-shell company-showcase__head">
+        <div className="section-heading section-heading--split">
           <div>
             <span className="section-kicker">16 COMPANIES / ONE SUGON</span>
             <h2 id="companies-heading">每一连，都是主角</h2>
           </div>
           <div className="section-heading__aside">
-            <p>46 人一连，16 份不同锋芒。点击连队编号，展开属于他们的集体影像。</p>
-            <button
-              type="button"
-              className="button button--signal"
-              onClick={spotlightCompany}
-              disabled={spotlighting}
-              data-cursor="spark"
-            >
+            <p>46 人一连，16 份不同锋芒。左右滑动，遇见每一支队伍。</p>
+            <button type="button" className="button button--signal" onClick={spotlight} data-cursor="spark">
               <Shuffle aria-hidden="true" />
-              {spotlighting ? "正在巡航" : "随机点亮一连"}
+              随机点亮一连
             </button>
           </div>
-        </motion.div>
+        </div>
+      </div>
 
-        <motion.div
-          className="company-switcher"
-          role="group"
-          aria-label="选择连队"
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.25 }}
-          transition={{ duration: reduceMotion ? 0 : 0.58, delay: reduceMotion ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {companies.map((item) => (
-            <button
-              key={item.id}
-              className={`company-switcher__item ${item.id === company.id ? "is-active" : ""}`}
-              type="button"
-              onClick={() => onSelectCompany(item.id)}
-              aria-pressed={item.id === company.id}
-              style={{ "--company-accent": item.accent } as CSSProperties}
-              data-cursor="spark"
-            >
-              <span>{item.number}</span>
-              <small>{item.name}</small>
-            </button>
-          ))}
-        </motion.div>
-
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={company.id}
-            className="company-feature"
-            style={{ "--company-accent": company.accent } as CSSProperties}
-            initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.992 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -14, scale: 0.995 }}
-            transition={{ duration: reduceMotion ? 0 : 0.48, ease: [0.22, 1, 0.36, 1] }}
+      <div
+        className="company-track"
+        ref={trackRef}
+        onScroll={handleScroll}
+        role="group"
+        aria-label="连队风采卡片，左右滑动切换"
+      >
+        {companies.map((item, index) => (
+          <article
+            key={item.id}
+            className="company-card"
+            style={{ "--company-accent": item.accent } as CSSProperties}
+            aria-label={`第 ${item.number} 连 · ${item.name}`}
           >
-            <div className="company-feature__visual">
-              <img src={company.image} alt={`${company.name}连队风采示例`} width="1800" height="1200" loading="lazy" />
-              <div className="company-feature__number" aria-hidden="true">{company.number}</div>
-              <span className="demo-label">示例影像</span>
-            </div>
-            <div className="company-feature__copy">
-              <span className="company-feature__index">第 {company.number} 连</span>
-              <h3>{company.name}</h3>
-              <blockquote>“{company.motto}”</blockquote>
-              <p>{company.summary}</p>
-              <div className="company-feature__facts">
-                <span><Users aria-hidden="true" /><strong>{company.members}</strong> 位伙伴</span>
-                <span><Images aria-hidden="true" /><strong>{companyMedia.length}</strong> 个瞬间</span>
+            <img
+              className="company-card__bg"
+              src={item.image}
+              alt=""
+              loading={index < 2 ? "eager" : "lazy"}
+              decoding="async"
+            />
+            <div className="company-card__shade" aria-hidden="true" />
+            <span className="company-card__number" aria-hidden="true">{item.number}</span>
+            <span className="demo-label">示例影像</span>
+            <div className="company-card__body">
+              <span className="company-card__index">第 {item.number} 连</span>
+              <h3>{item.name}</h3>
+              <blockquote>“{item.motto}”</blockquote>
+              <p>{item.summary}</p>
+              <div className="company-card__facts">
+                <span><Users aria-hidden="true" /><strong>{item.members}</strong> 位伙伴</span>
+                <span><Images aria-hidden="true" /><strong>{momentCounts.get(item.id) || 0}</strong> 个瞬间</span>
               </div>
-              <button className="text-button" type="button" onClick={handleViewMedia} data-cursor="view">
+              <button className="text-button" type="button" onClick={() => onViewCompany(item.id)} data-cursor="view">
                 查看本连影像
                 <ArrowUpRight aria-hidden="true" />
               </button>
             </div>
-          </motion.div>
-        </AnimatePresence>
+          </article>
+        ))}
       </div>
-    </section>
+
+      <div className="page-shell company-showcase__nav">
+        <button type="button" className="icon-button" onClick={() => scrollToIndex(active - 1)} disabled={active === 0} aria-label="上一支连队">
+          <ArrowLeft aria-hidden="true" />
+        </button>
+        <div className="company-dots" role="group" aria-label="选择连队">
+          {companies.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              className={index === active ? "is-active" : ""}
+              onClick={() => scrollToIndex(index)}
+              aria-label={`第 ${item.number} 连 ${item.name}`}
+              aria-pressed={index === active}
+            />
+          ))}
+        </div>
+        <span className="company-counter" aria-live="polite">{String(active + 1).padStart(2, "0")} / {companies.length}</span>
+        <button type="button" className="icon-button" onClick={() => scrollToIndex(active + 1)} disabled={active === companies.length - 1} aria-label="下一支连队">
+          <ArrowRight aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   );
 }

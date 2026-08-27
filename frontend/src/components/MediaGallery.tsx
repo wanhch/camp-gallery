@@ -7,13 +7,15 @@ import type { MediaItem, MediaType } from "../types";
 interface MediaGalleryProps {
   media: MediaItem[];
   selectedCompany: number;
+  filter: MediaFilter;
   onCompanyChange: (company: number) => void;
+  onFilterChange: (filter: MediaFilter) => void;
   onOpen: (item: MediaItem) => void;
   onLike: (item: MediaItem) => void;
   onUpload?: () => void;
 }
 
-type MediaFilter = "all" | MediaType;
+export type MediaFilter = "all" | MediaType;
 
 function formatMoment(value: string) {
   const date = new Date(value);
@@ -24,10 +26,14 @@ function formatMoment(value: string) {
     : date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
 }
 
-export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, onLike, onUpload }: MediaGalleryProps) {
-  const [filter, setFilter] = useState<MediaFilter>("all");
+export function MediaGallery({ media, selectedCompany, filter, onCompanyChange, onFilterChange, onOpen, onLike, onUpload }: MediaGalleryProps) {
   const [expanded, setExpanded] = useState(false);
   const reduceMotion = useReducedMotion();
+  // 移动端不在网格里挂载真实 video 元素，避免每个视频建立解码连接；点击进灯箱才加载
+  const staticVideoCards = useMemo(
+    () => window.matchMedia("(pointer: coarse), (max-width: 820px)").matches,
+    []
+  );
 
   const filteredMedia = useMemo(() => media.filter((item) => {
     const matchesCompany = selectedCompany === 0 || item.company === selectedCompany;
@@ -66,13 +72,13 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
           transition={{ duration: reduceMotion ? 0 : 0.5, delay: reduceMotion ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="segmented-control" role="group" aria-label="媒体类型">
-            <button type="button" className={filter === "all" ? "is-active" : ""} onClick={() => setFilter("all")} aria-pressed={filter === "all"}>
+            <button type="button" className={filter === "all" ? "is-active" : ""} onClick={() => onFilterChange("all")} aria-pressed={filter === "all"}>
               <Images aria-hidden="true" />全部
             </button>
-            <button type="button" className={filter === "photo" ? "is-active" : ""} onClick={() => setFilter("photo")} aria-pressed={filter === "photo"}>
+            <button type="button" className={filter === "photo" ? "is-active" : ""} onClick={() => onFilterChange("photo")} aria-pressed={filter === "photo"}>
               <Camera aria-hidden="true" />照片
             </button>
-            <button type="button" className={filter === "video" ? "is-active" : ""} onClick={() => setFilter("video")} aria-pressed={filter === "video"}>
+            <button type="button" className={filter === "video" ? "is-active" : ""} onClick={() => onFilterChange("video")} aria-pressed={filter === "video"}>
               <Video aria-hidden="true" />视频
             </button>
           </div>
@@ -109,9 +115,11 @@ export function MediaGallery({ media, selectedCompany, onCompanyChange, onOpen, 
                 >
                   <button className="media-card__open" type="button" onClick={() => onOpen(item)} aria-label={`查看${item.caption}`} data-cursor="view">
                     {item.type === "video" ? (
-                      <video src={item.url} muted playsInline preload="metadata" aria-label={item.caption} />
+                      staticVideoCards
+                        ? <span className="media-card__video-static" aria-hidden="true" />
+                        : <video src={item.url} muted playsInline preload="metadata" aria-label={item.caption} />
                     ) : (
-                      <img src={item.url} alt={item.caption} width="900" height="900" loading="lazy" />
+                      <img src={item.thumbnailUrl ?? item.url} alt={item.caption} width="900" height="900" loading="lazy" decoding="async" />
                     )}
                     <span className="media-card__shade" aria-hidden="true" />
                     {item.type === "video" && <span className="media-card__play"><Play fill="currentColor" aria-hidden="true" /></span>}

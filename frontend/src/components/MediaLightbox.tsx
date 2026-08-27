@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { ArrowLeft, ArrowRight, Heart, Share2, X } from "lucide-react";
 import { categoryLabel, getCategory } from "../data/companies";
 import type { MediaItem } from "../types";
@@ -17,6 +17,7 @@ interface MediaLightboxProps {
 
 export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, onClose, onLike, onNotice }: MediaLightboxProps) {
   const titleId = useId();
+  const stageRef = useRef<HTMLDivElement>(null);
   const company = getCategory(item.company);
 
   useEffect(() => {
@@ -27,6 +28,68 @@ export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, 
     document.addEventListener("keydown", handleArrowKeys);
     return () => document.removeEventListener("keydown", handleArrowKeys);
   }, [hasNext, hasPrevious, onNext, onPrevious]);
+
+  // 触屏手势：水平滑动切换，下滑关闭；滑动中画面跟随手指
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    let axis: "x" | "y" | null = null;
+
+    const settle = () => {
+      stage.style.transition = "transform 220ms ease";
+      stage.style.transform = "";
+      window.setTimeout(() => { stage.style.transition = ""; }, 240);
+    };
+
+    const handleDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" || !event.isPrimary) return;
+      const target = event.target as HTMLElement;
+      if (target.closest("button") || target.closest("video")) return;
+      tracking = true;
+      axis = null;
+      startX = event.clientX;
+      startY = event.clientY;
+    };
+    const handleMove = (event: PointerEvent) => {
+      if (!tracking) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      if (axis === "x") stage.style.transform = `translateX(${dx}px)`;
+      else if (axis === "y") stage.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    };
+    const handleUp = (event: PointerEvent) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      const currentAxis = axis;
+      axis = null;
+      settle();
+      if (currentAxis === "x" && Math.abs(dx) > 48) {
+        if (dx < 0 && hasNext) onNext();
+        else if (dx > 0 && hasPrevious) onPrevious();
+      } else if (currentAxis === "y" && dy > 72) {
+        onClose();
+      }
+    };
+
+    stage.addEventListener("pointerdown", handleDown, { passive: true });
+    stage.addEventListener("pointermove", handleMove, { passive: true });
+    stage.addEventListener("pointerup", handleUp, { passive: true });
+    stage.addEventListener("pointercancel", handleUp, { passive: true });
+    return () => {
+      stage.removeEventListener("pointerdown", handleDown);
+      stage.removeEventListener("pointermove", handleMove);
+      stage.removeEventListener("pointerup", handleUp);
+      stage.removeEventListener("pointercancel", handleUp);
+      stage.style.transform = "";
+      stage.style.transition = "";
+    };
+  }, [hasNext, hasPrevious, onNext, onPrevious, onClose]);
 
   const share = async () => {
     const url = `${window.location.origin}${window.location.pathname}?moment=${encodeURIComponent(item.id)}`;
@@ -48,7 +111,7 @@ export function MediaLightbox({ item, hasPrevious, hasNext, onPrevious, onNext, 
 
   return (
     <ModalFrame onClose={onClose} labelId={titleId} className="lightbox-modal">
-      <div className="lightbox-stage">
+      <div className="lightbox-stage" ref={stageRef}>
         {item.type === "video" ? (
           <video src={item.url} controls playsInline autoPlay aria-label={item.caption} />
         ) : (
